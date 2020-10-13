@@ -1,6 +1,6 @@
 - stage: Build
   displayName: Build stage
-jobs:
+  jobs:
 - deployment: VMDeploy
   displayName: web
   pool:

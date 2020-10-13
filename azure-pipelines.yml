@@ -25,4 +25,3 @@ steps:
         archiveFile: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
         replaceExistingArchive: true
 - upload: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
-      artifact: drop

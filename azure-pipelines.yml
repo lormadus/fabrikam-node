@@ -1,13 +1,13 @@
-- stage: Build
-  displayName: Build stage
-  jobs:
-- deployment: VMDeploy
-  displayName: web
   pool:
     vmImage: 'Ubuntu-18.04'
   environment:
     name: <environment name>
     resourceType: VirtualMachine
+- stage: Build
+  displayName: Build stage
+  jobs:
+- deployment: VMDeploy
+  displayName: web
   strategy:
       runOnce:
         deploy:

@@ -1,71 +1,63 @@
-variables:
-    MAP_NPMTOKEN: $(NPMTOKEN) # Mapping secret var
-
 trigger:
-- none
+- master
 
 pool:
   vmImage: 'ubuntu-latest'
 
-steps: # Checking out connected repo
-- checkout: self
-  persistCredentials: true
-  clean: true
-    
-- task: npmAuthenticate@0
-  inputs:
-    workingFile: .npmrc
-    customEndpoint: 'my-npm-connection'
-    
+steps:
 - task: NodeTool@0
   inputs:
-    versionSpec: '12.x'
+    versionSpec: '10.x'
   displayName: 'Install Node.js'
 
 - script: |
     npm install
-  displayName: 'npm install'
-
-- script: |
-    npm pack
-  displayName: 'Package for release'
-
-- bash: | # Grab the package version
-    v=`node -p "const p = require('./package.json'); p.version;"`
-    echo "##vso[task.setvariable variable=packageVersion]$v"
+    npm run build
+  displayName: 'npm install and build'
 
 - task: CopyFiles@2
   inputs:
-      contents: '*.tgz'
-      targetFolder: $(Build.ArtifactStagingDirectory)/npm
-  displayName: 'Copy archives to artifacts staging directory'
+    Contents: 'build/**' # Pull the build directory (React)
+    TargetFolder: '$(Build.ArtifactStagingDirectory)'
 
-- task: CopyFiles@2
-  inputs:
-    sourceFolder: '$(Build.SourcesDirectory)'
-    contents: 'package.json' 
-    targetFolder: $(Build.ArtifactStagingDirectory)/npm
-  displayName: 'Copy package.json'
+- task: PublishBuildArtifacts@1
+  inputs: 
+    pathtoPublish: $(Build.ArtifactStagingDirectory) # dist or build files
+    ArtifactName: 'www' # output artifact named www
 
-- task: PublishBuildArtifacts@1 
-  inputs:
-    pathtoPublish: '$(Build.ArtifactStagingDirectory)/npm'
-    artifactName: npm
-  displayName: 'Publish npm artifact'
-
-- script: |  # Config can be set in .npmrc
-    npm config set //registry.npmjs.org/:_authToken=$(MAP_NPMTOKEN) 
-    npm config set scope "@myscope"
-    # npm config list
-    # npm --version
-    npm version patch --force
-    npm publish --access public
-
-- task: CmdLine@2 # Push changes to GitHub (substitute your repo)
-  inputs:
-    script: |
-      git config --global user.email "username@contoso.com"
-      git config --global user.name "Azure Pipeline"
-      git add package.json
-      git commit -a -m "Test Commit from Azure DevOps"
-      git push -u origin HEAD:master
+jobs: 
+- deployment: VMDeploy
+  displayName: web
+  environment:
+    name: <environment name>
+    resourceType: VirtualMachine
+  strategy:
+      rolling:
+        maxParallel: 5  #for percentages, mention as x%
+        preDeploy:
+          steps:
+          - download: current
+            artifact: drop
+          - script: echo initialize, cleanup, backup, install certs
+        deploy:
+          steps:
+          - task: Bash@3
+            inputs:
+              targetType: 'inline'
+              script: |
+                # Modify deployment script based on the app type
+                echo "Starting deployment script run"
+                sudo java -jar '$(Pipeline.Workspace)/drop/**/target/*.jar'
+        routeTraffic:
+          steps:
+          - script: echo routing traffic
+        postRouteTraffic:
+          steps:
+          - script: echo health check post-route traffic
+        on:
+          failure:
+            steps:
+            - script: echo Restore from backup! This is on failure
+          success:
+            steps:
+            - script: echo Notify! This is on success
